@@ -54,6 +54,14 @@ HOST_UTIL_LINUX_CONF_OPTS = \
 	--with-systemdsystemunitdir=no \
 	--without-python
 
+# Remove -Waddress-of-packed-member which is not supported in older gcc
+HOST_UTIL_LINUX_POST_EXTRACT_HOOKS += HOST_UTIL_LINUX_REMOVE_WARNING
+
+define HOST_UTIL_LINUX_REMOVE_WARNING
+	$(SED) 's/-Waddress-of-packed-member//g' $(@D)/configure.ac
+	$(SED) 's/-Waddress-of-packed-member//g' $(@D)/configure
+endef
+
 ifneq ($(BR2_PACKAGE_UTIL_LINUX_BINARIES)$(BR2_PACKAGE_UTIL_LINUX_CRAMFS)$(BR2_PACKAGE_UTIL_LINUX_FSCK)$(BR2_PACKAGE_UTIL_LINUX_LOSETUP),)
 UTIL_LINUX_SELINUX_MODULES = fstools
 endif

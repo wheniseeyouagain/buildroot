@@ -136,15 +136,18 @@ ifeq ($(BR2_PACKAGE_CAMERA_ENGINE_RKAIQ_RKISP_DEMO), y)
 CAMERA_ENGINE_RKAIQ_CONF_OPTS += -DENABLE_RKISP_DEMO=ON
 endif
 
+# Disable ccache to avoid issues with read-only filesystem
+CAMERA_ENGINE_RKAIQ_MAKE_ENV = CCACHE_DISABLE=1
+
 define CAMERA_ENGINE_RKAIQ_INSTALL_STAGING_CMDS
-	$(TARGET_MAKE_ENV) DESTDIR=$(STAGING_DIR) $(MAKE) -C $($(PKG)_BUILDDIR) install
+	$(TARGET_MAKE_ENV) $(CAMERA_ENGINE_RKAIQ_MAKE_ENV) DESTDIR=$(STAGING_DIR) $(MAKE) -C $($(PKG)_BUILDDIR) install
 endef
 
 define CAMERA_ENGINE_RKAIQ_INSTALL_CMDS
 	mkdir -p $(TARGET_DIR)/etc/iqfiles/
 	mkdir -p $(TARGET_DIR)/usr/lib/
 	mkdir -p $(TARGET_DIR)/usr/bin/
-	$(TARGET_MAKE_ENV) DESTDIR=$(TARGET_DIR) $(MAKE) -C $($(PKG)_BUILDDIR) install
+	$(TARGET_MAKE_ENV) $(CAMERA_ENGINE_RKAIQ_MAKE_ENV) DESTDIR=$(TARGET_DIR) $(MAKE) -C $($(PKG)_BUILDDIR) install
 	$(INSTALL) -D -m  644 $(@D)/rkaiq/all_lib/MinSizeRel/librkaiq.so $(TARGET_DIR)/usr/lib/
 	$(foreach iqfile,$(CAMERA_ENGINE_RKAIQ_IQFILE_INSTALL),
 		$(INSTALL) -D -m  644 $(@D)/rkaiq/iqfiles/$(iqfile) \
