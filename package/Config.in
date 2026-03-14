@@ -2677,7 +2677,8 @@ endif
 	source "package/zabbix/Config.in"
 	source "package/zeek/Config.in"
 	source "package/znc/Config.in"
-
+	source "package/quectel-cm/Config.in"
+	
 endmenu
 
 menu "Package managers"

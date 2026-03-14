@@ -1,0 +1,4 @@
+config BR2_PACKAGE_QUECTEL_CM
+    bool "Quectel QConnectManager Linux (quectel-CM)"
+    help
+      User space dialer for Quectel 4G/5G modules, also known as quectel-CM.

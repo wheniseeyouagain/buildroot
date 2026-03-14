@@ -23,14 +23,10 @@ define RKSCRIPT_INSTALL_INIT_SYSV
 endef
 endif # IODOMAIN_NOTICE
 
-ifneq ($(BR2_PACKAGE_RKSCRIPT_DEFAULT_PCM),"")
 define RKSCRIPT_INSTALL_TARGET_PCM_HOOK
 	$(INSTALL) -m 0644 -D $(RKSCRIPT_PKGDIR)/asound.conf.in \
 		$(TARGET_DIR)/etc/asound.conf
-	$(SED) "s#\#PCM_ID#$(BR2_PACKAGE_RKSCRIPT_DEFAULT_PCM)#g" \
-		$(TARGET_DIR)/etc/asound.conf
 endef
 RKSCRIPT_POST_INSTALL_TARGET_HOOKS += RKSCRIPT_INSTALL_TARGET_PCM_HOOK
-endif # PCM
 
 $(eval $(generic-package))
