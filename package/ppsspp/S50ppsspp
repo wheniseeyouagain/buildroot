@@ -1,0 +1,69 @@
+#!/bin/sh
+
+DAEMON=/usr/bin/PPSSPPSDL
+PIDFILE=/var/run/ppsspp.pid
+RUNTIME_DIR=/var/run
+WAYLAND_SOCKET=$RUNTIME_DIR/wayland-0
+PULSE_SOCKET=/tmp/pulse-socket
+
+start_ppsspp()
+{
+	if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
+		return 0
+	fi
+
+	attempt=0
+	while [ ! -S "$WAYLAND_SOCKET" ] && [ "$attempt" -lt 30 ]; do
+		sleep 1
+		attempt=$((attempt + 1))
+	done
+
+	if [ ! -S "$WAYLAND_SOCKET" ]; then
+		echo "PPSSPP: Weston Wayland socket not available: $WAYLAND_SOCKET" >&2
+		return 1
+	fi
+
+	attempt=0
+	while [ ! -S "$PULSE_SOCKET" ] && [ "$attempt" -lt 15 ]; do
+		sleep 1
+		attempt=$((attempt + 1))
+	done
+
+	if [ ! -S "$PULSE_SOCKET" ]; then
+		echo "PPSSPP: PulseAudio socket not available: $PULSE_SOCKET" >&2
+		return 1
+	fi
+
+	mkdir -p /root/.config/ppsspp /root/.local/share/ppsspp
+	XDG_RUNTIME_DIR="$RUNTIME_DIR" \
+	WAYLAND_DISPLAY=wayland-0 \
+	SDL_VIDEODRIVER=wayland \
+	SDL_AUDIODRIVER=pulseaudio \
+	PULSE_SERVER="unix:$PULSE_SOCKET" \
+	HOME=/root \
+		start-stop-daemon -S -b -m -p "$PIDFILE" -x "$DAEMON" \
+		>>/var/log/ppsspp.log 2>&1
+}
+
+stop_ppsspp()
+{
+	start-stop-daemon -K -q -p "$PIDFILE"
+	rm -f "$PIDFILE"
+}
+
+case "$1" in
+	start)
+		start_ppsspp
+		;;
+	stop)
+		stop_ppsspp
+		;;
+	restart|reload)
+		stop_ppsspp
+		start_ppsspp
+		;;
+	*)
+		echo "Usage: $0 {start|stop|restart}"
+		exit 1
+		;;
+esac

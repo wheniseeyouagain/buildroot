@@ -1,0 +1,29 @@
+#!/bin/sh
+
+case "$1" in
+	start|restart)
+		attempt=0
+		while [ ! -e /dev/snd/controlC0 ] && [ "$attempt" -lt 20 ]; do
+			sleep 1
+			attempt=$((attempt + 1))
+		done
+
+		if [ ! -e /dev/snd/controlC0 ]; then
+			echo "RK809 audio: ALSA control device is unavailable" >&2
+			exit 1
+		fi
+
+		if ! /usr/bin/amixer -c 0 cset name='Playback Path' SPK; then
+			echo "RK809 audio: failed to enable the speaker output path" >&2
+			exit 1
+		fi
+		;;
+	stop)
+		;;
+	*)
+		echo "Usage: $0 {start|stop|restart}" >&2
+		exit 1
+		;;
+esac
+
+exit 0

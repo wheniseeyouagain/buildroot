@@ -1,0 +1,18 @@
+From 6efcb2da2f2c3f56a5a9aa0f42f96331f26ecf86 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] Use pkg-config to find SDL2_ttf when cross-compiling
+
+The Buildroot SDL2_ttf CMake config uses host-absolute library paths and
+does not create its imported target under cross-compilation.
+---
+ CMakeLists.txt | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -326,3 +326,2 @@ if(NOT LIBRETRO AND NOT IOS AND NOT MACOSX)
+ 	find_package(SDL2)
+-	find_package(SDL2_ttf)
+ 	find_package(Fontconfig)
+-- 
+2.39.5
