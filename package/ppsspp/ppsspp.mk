@@ -8,7 +8,7 @@ PPSSPP_SOURCE = ppsspp-$(PPSSPP_VERSION).tar.xz
 PPSSPP_SITE = https://github.com/hrydgard/ppsspp/releases/download/v$(PPSSPP_VERSION)
 
 PPSSPP_DEPENDENCIES = sdl2 sdl2_ttf fontconfig zlib zstd libpng libzip wayland \
-	source-han-sans-cn
+	source-han-sans-cn ffmpeg
 PPSSPP_SUPPORTS_IN_SOURCE_BUILD = NO
 
 PPSSPP_CONF_OPTS += \
@@ -17,7 +17,8 @@ PPSSPP_CONF_OPTS += \
 	-DUSING_EGL=ON \
 	-DUSING_GLES2=ON \
 	-DARM_NO_VULKAN=ON \
-	-DUSE_FFMPEG=OFF \
+	-DUSE_FFMPEG=ON \
+	-DUSE_SYSTEM_FFMPEG=ON \
 	-DUSE_DISCORD=OFF \
 	-DUSE_SYSTEM_LIBSDL2=ON \
 	-DUSE_SYSTEM_LIBZIP=ON \

@@ -34,7 +34,6 @@ start_ppsspp()
 		return 1
 	fi
 
-	mkdir -p /root/.config/ppsspp /root/.local/share/ppsspp
 	XDG_RUNTIME_DIR="$RUNTIME_DIR" \
 	WAYLAND_DISPLAY=wayland-0 \
 	SDL_VIDEODRIVER=wayland \

@@ -1,0 +1,85 @@
+From: Tspi <builds@example.invalid>
+Subject: [PATCH] Store PPSSPP data in /userdata/ppsspp/.PSP and fix save writes
+
+Place PPSSPP settings and memory-stick data in a hidden directory under the
+dedicated /userdata/ppsspp folder, which is also the default game browser root.
+Resolve case-sensitive writes after mapping the PSP compatibility path to that root.
+
+---
+--- a/UI/NativeApp.cpp
++++ b/UI/NativeApp.cpp
+@@ -471,6 +471,11 @@
+ 	g_Config.memStickDirectory = g_Config.internalDataDirectory / "config/ppsspp";
+ 	g_Config.flash0Directory = g_Config.internalDataDirectory / "assets/flash0";
+ #elif !PPSSPP_PLATFORM(WINDOWS)
++#if PPSSPP_PLATFORM(LINUX) && !PPSSPP_PLATFORM(ANDROID) && !defined(PPSSPP_HOST_DEV)
++	g_Config.internalDataDirectory = Path("/userdata/ppsspp/.PSP");
++	g_Config.memStickDirectory = Path("/userdata/ppsspp/.PSP");
++	g_Config.defaultCurrentDirectory = Path("/userdata/ppsspp");
++#else
+ 	std::string config;
+ 	if (getenv("XDG_CONFIG_HOME") != NULL)
+ 		config = getenv("XDG_CONFIG_HOME");
+@@ -480,7 +485,6 @@
+ 		config = "./config";
+ 
+ 	g_Config.memStickDirectory = Path(config) / "ppsspp";
+-	g_Config.flash0Directory = File::GetExeDirectory() / "assets/flash0";
+ 	if (getenv("HOME") != nullptr) {
+ 		g_Config.defaultCurrentDirectory = Path(getenv("HOME"));
+ 	} else {
+@@ -489,6 +493,8 @@
+ 		g_Config.currentDirectory = Path(".");
+ 	}
+ #endif
++	g_Config.flash0Directory = File::GetExeDirectory() / "assets/flash0";
++#endif
+ 
+ 	if (g_Config.currentDirectory.empty()) {
+ 		g_Config.currentDirectory = g_Config.defaultCurrentDirectory;
+--- a/Core/Util/PathUtil.cpp
++++ b/Core/Util/PathUtil.cpp
+@@ -45,7 +45,8 @@
+ Path GetSysDirectory(PSPDirectories directoryType) {
+ 	const Path &memStickDirectory = g_Config.memStickDirectory;
+ 	Path pspDirectory;
+-	if (!strcasecmp(memStickDirectory.GetFilename().c_str(), "PSP")) {
++	if (!strcasecmp(memStickDirectory.GetFilename().c_str(), "PSP") ||
++		!strcasecmp(memStickDirectory.GetFilename().c_str(), ".PSP")) {
+ 		// Let's strip this off, to easily allow choosing a root directory named "PSP" on Android.
+ 		pspDirectory = memStickDirectory;
+ 	} else {
+--- a/Core/FileSystems/DirectoryFileSystem.cpp
++++ b/Core/FileSystems/DirectoryFileSystem.cpp
+@@ -134,19 +134,27 @@
+ 		return false;
+ 	}
+ 
++	Path fullName = GetLocalPath(basePath, fileName);
+ 	if (fileSystemFlags_ & FileSystemFlags::CASE_SENSITIVE) {
+ 		if (access & (FILEACCESS_APPEND | FILEACCESS_CREATE | FILEACCESS_WRITE)) {
+ 			DEBUG_LOG(Log::FileSystem, "Checking case for path %s", fileName.c_str());
+-			if (!FixPathCase(basePath, fileName, FPC_PATH_MUST_EXIST)) {
++			std::string pathForCaseFix = fileName;
++			if (fileSystemFlags_ & FileSystemFlags::STRIP_PSP) {
++				if (!basePath.ComputePathTo(fullName, pathForCaseFix) || !FixPathCase(basePath, pathForCaseFix, FPC_PATH_MUST_EXIST)) {
++					error = SCE_KERNEL_ERROR_ERRNO_FILE_NOT_FOUND;
++					return false;  // or go on and attempt (for a better error code than just 0?)
++				}
++				fullName = basePath / pathForCaseFix;
++			} else if (!FixPathCase(basePath, fileName, FPC_PATH_MUST_EXIST)) {
+ 				error = SCE_KERNEL_ERROR_ERRNO_FILE_NOT_FOUND;
+ 				return false;  // or go on and attempt (for a better error code than just 0?)
++			} else {
++				fullName = GetLocalPath(basePath, fileName);
+ 			}
+ 		}
+ 	}
+ 	// else we try fopen first (in case we're lucky) before simulating case insensitivity
+ 
+-	Path fullName = GetLocalPath(basePath, fileName);
+-
+ 	// On the PSP, truncating doesn't lose data.  If you seek later, you'll recover it.
+ 	// This is abnormal, so we deviate from the PSP's behavior and truncate on write/close.
+ 	// This means it's incorrectly not truncated before the write.
+

@@ -1,1 +1,1 @@
-export PULSE_HOME=/userdata/.pulse
+export PULSE_HOME=/root

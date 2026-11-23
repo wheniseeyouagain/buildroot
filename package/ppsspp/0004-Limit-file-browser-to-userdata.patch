@@ -1,0 +1,94 @@
+From: Tspi <builds@example.invalid>
+Subject: [PATCH] Limit PPSSPP file browsing to /userdata/ppsspp on Linux
+
+Keep the embedded Linux game browser and saved location inside /userdata/ppsspp. Resolve
+paths before checking the boundary so symlinks cannot escape the allowed tree. Preserve
+the recent-games tab without saving its special path as the current directory.
+
+---
+--- a/UI/GameBrowser.cpp
++++ b/UI/GameBrowser.cpp
+@@ -531,12 +531,27 @@
+ 	} else {
+ 		aliasDisplay_ = "ms:/";
+ 	}
++	Path startPath = path;
++#if PPSSPP_PLATFORM(LINUX) && !PPSSPP_PLATFORM(ANDROID) && !defined(PPSSPP_HOST_DEV)
++	// The recent-games tab uses a special path and must not become the saved directory.
++	if ((browseFlags_ & BrowseFlags::NAVIGATE) && startPath.ToString() == "!RECENT") {
++		startPath = Path("/userdata/ppsspp");
++	}
++	if (startPath.Type() == PathType::NATIVE && !startsWith(startPath.ToString(), "!")) {
++		// Keep the embedded Linux browser inside the user's data partition.
++		path_.RestrictToRoot(Path("/userdata/ppsspp"));
++	}
++#else
+ 	if (System_GetPropertyBool(SYSPROP_LIMITED_FILE_BROWSING) &&
+-		(path.Type() == PathType::NATIVE || path.Type() == PathType::CONTENT_URI)) {
++		(startPath.Type() == PathType::NATIVE || startPath.Type() == PathType::CONTENT_URI)) {
+ 		// Note: We don't restrict if the path is HTTPS, otherwise remote disc streaming breaks!
+ 		path_.RestrictToRoot(GetSysDirectory(DIRECTORY_MEMSTICK_ROOT));
+ 	}
+-	path_.SetPath(path);
++#endif
++	path_.SetPath(startPath);
++	if ((browseFlags_ & BrowseFlags::NAVIGATE) && path_.GetPath().Type() == PathType::NATIVE) {
++		g_Config.currentDirectory = path_.GetPath();
++	}
+ 	Refresh();
+ }
+ 
+@@ -775,11 +790,13 @@
+ 			// we show just the image, because we don't need to emphasize the button on Darwin
+ 			topBar->Add(new Choice(ImageID("I_FOLDER_OPEN"), new LayoutParams(WRAP_CONTENT, 64.0f)))->OnClick.Handle(this, &GameBrowser::BrowseClick);
+ #else
++#if !(PPSSPP_PLATFORM(LINUX) && !PPSSPP_PLATFORM(ANDROID) && !defined(PPSSPP_HOST_DEV))
+ 			if ((browseFlags_ & BrowseFlags::BROWSE) && System_GetPropertyBool(SYSPROP_HAS_FOLDER_BROWSER)) {
+ 				// Collapse the button title on very small screens (Retroid Pocket) or portrait mode.
+ 				std::string_view browseTitle = (g_display.dp_xres <= 550 || portrait_) ? "" : mm->T("Browse");
+ 				topBar->Add(new Choice(browseTitle, ImageID("I_FOLDER_OPEN"), new LayoutParams(WRAP_CONTENT, 64.0f)))->OnClick.Handle(this, &GameBrowser::BrowseClick);
+ 			}
++#endif
+ 			if (System_GetPropertyInt(SYSPROP_DEVICE_TYPE) == DEVICE_TYPE_TV) {
+ 				topBar->Add(new Choice(mm->T("Enter Path"), new LayoutParams(WRAP_CONTENT, 64.0f)))->OnClick.Add([=](UI::EventParams &) {
+ 					auto mm = GetI18NCategory(I18NCat::MAINMENU);
+--- a/Common/File/PathBrowser.cpp
++++ b/Common/File/PathBrowser.cpp
+@@ -217,8 +217,26 @@
+ 	return true;
+ }
+ 
++static bool IsWithinRestrictedRoot(const Path &path, const Path &root) {
++	if (root.empty()) {
++		return true;
++	}
++	if (path.Type() != root.Type()) {
++		return false;
++	}
++	const std::string resolvedPath = File::ResolvePath(path.ToString());
++	const std::string resolvedRoot = File::ResolvePath(root.ToString());
++	if (!startsWith(resolvedPath, resolvedRoot)) {
++		return false;
++	}
++	if (resolvedPath.size() == resolvedRoot.size() || (!resolvedRoot.empty() && resolvedRoot.back() == '/')) {
++		return true;
++	}
++	return resolvedPath[resolvedRoot.size()] == '/';
++}
++
+ void PathBrowser::ApplyRestriction() {
+-	if (!path_.StartsWith(restrictedRoot_) && !startsWith(path_.ToString(), "!")) {
++	if (!IsWithinRestrictedRoot(path_, restrictedRoot_) && !startsWith(path_.ToString(), "!")) {
+ 		WARN_LOG(Log::IO, "Applying path restriction: %s (%s didn't match)", restrictedRoot_.c_str(), path_.c_str());
+ 		path_ = restrictedRoot_;
+ 	}
+@@ -226,7 +244,8 @@
+ 
+ bool PathBrowser::CanNavigateUp() const {
+ 	std::unique_lock<std::mutex> guard(pendingLock_);
+-	if (path_ == restrictedRoot_) {
++	if (IsWithinRestrictedRoot(path_, restrictedRoot_) &&
++		File::ResolvePath(path_.ToString()) == File::ResolvePath(restrictedRoot_.ToString())) {
+ 		return false;
+ 	}
+ 	return path_.CanNavigateUp();

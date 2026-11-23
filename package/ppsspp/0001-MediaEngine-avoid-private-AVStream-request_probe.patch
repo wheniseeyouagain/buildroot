@@ -1,0 +1,15 @@
+From: Tspi Build Fix <builds@example.invalid>
+Subject: [PATCH] MediaEngine: avoid private AVStream request_probe field
+
+FFmpeg 4.4 does not expose AVStream::request_probe in its public headers.
+PPSSPP already sets need_parsing to AVSTREAM_PARSE_FULL for this stream, so
+avoid accessing the unavailable private field.
+
+--- a/Core/HW/MediaEngine.cpp
++++ b/Core/HW/MediaEngine.cpp
+@@ -433,6 +433,5 @@
+ 			avpriv_stream_set_need_parsing(stream, AVSTREAM_PARSE_FULL);
+ #else
+-			stream->request_probe = 0;
+ 			stream->need_parsing = AVSTREAM_PARSE_FULL;
+ #endif
